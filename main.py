@@ -37,6 +37,25 @@ def init():
 def log(request):
     pass
 
+def write_log(response, user_id):
+    json_response = response.json()
+    usage = json_response.get("usage", {})
+    prompt_tokens = usage.get("prompt_tokens", 0)
+    completion_tokens = usage.get("completion_tokens", 0)
+    
+    user_name = get_name_by_user_id(user_id)
+    log_entry = f"{time.strftime('%Y-%m-%d %H:%M:%S')} | User: {user_name} | Prompt Tokens: {prompt_tokens} | Completion Tokens: {completion_tokens}\n"
+    GCS.add_text_to_file(BUCKET_NAME, "log.txt", log_entry)
+    file_name = f"{user_name}_usage.txt"
+    usage = GCS.read_from_storage(BUCKET_NAME, file_name)
+    lines = usage.split("\n")
+    total_prompt_tokens = int(lines[0].split(":")[1])
+    total_completion_tokens = int(lines[1].split(":")[1])
+    total_prompt_tokens += prompt_tokens
+    total_completion_tokens += completion_tokens
+    usage = f"Total Prompt Tokens:{total_prompt_tokens}\nTotal Completion Tokens:{total_completion_tokens}\n"
+    GCS.write_to_storage(BUCKET_NAME, file_name, usage)    
+
 @functions_framework.http
 def main(request):
     # Track token usage and any other required logic
@@ -54,24 +73,7 @@ def main(request):
         response = requests.post(OPENAI_API_URL+request.path, headers=headers, json=data)
         
         if response.status_code == 200:
-            json_response = response.json()
-            usage = json_response.get("usage", {})
-            prompt_tokens = usage.get("prompt_tokens", 0)
-            completion_tokens = usage.get("completion_tokens", 0)
-
-            user_name = get_name_by_user_id(user_id)
-            log_entry = f"{time.strftime('%Y-%m-%d %H:%M:%S')} | User: {user_name} | Prompt Tokens: {prompt_tokens} | Completion Tokens: {completion_tokens}\n"
-            GCS.add_text_to_file(BUCKET_NAME, "log.txt", log_entry)
-            file_name = f"{user_name}_usage.txt"
-            usage = GCS.read_from_storage(BUCKET_NAME, file_name)
-            lines = usage.split("\n")
-            total_prompt_tokens = int(lines[0].split(":")[1])
-            total_completion_tokens = int(lines[1].split(":")[1])
-            total_prompt_tokens += prompt_tokens
-            total_completion_tokens += completion_tokens
-            usage = f"Total Prompt Tokens:{total_prompt_tokens}\nTotal Completion Tokens:{total_completion_tokens}\n"
-            GCS.write_to_storage(BUCKET_NAME, file_name, usage)    
-            
+            write_log(response, user_id)
             # Return the response from OpenAI's API
             return response.json()
         else:

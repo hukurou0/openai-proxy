@@ -22,7 +22,7 @@ def get_api_key_by_user_id(in_user_id):
     for line in users_list:
         name, user_id, api_key = line.split(":")
         if user_id == in_user_id:
-            return api_key
+            return api_key[:-1]
 
 def init():
     #log.txtとusage.txtを初期化する
@@ -64,7 +64,6 @@ def main(request):
     
     if user_id:
         api_key = get_api_key_by_user_id(user_id)
-        api_key = api_key[:-1] 
         headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
